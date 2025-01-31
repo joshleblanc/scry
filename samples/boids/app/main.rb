@@ -3,7 +3,7 @@ RESOLUTION = {
   h: 720
 }
 
-BOIDS_COUNT = 1000
+BOIDS_COUNT = 100
 
 SEPARATION_WEIGHT = 20
 ALIGNMENT_WEIGHT = 1.0
@@ -26,7 +26,7 @@ DIFF = { x: 0, y: 0 }
 MOUSE = { x: 0, y: 0 }
 
 def neighbours(entity, entities) 
-  grid = $args.state.query.find_one({ _id: :grid })
+  grid = $args.state.query.find_one({ id: :grid })
 
 
   grid_x = (entity.position.x / GRID_CELL_SIZE).floor
@@ -151,24 +151,13 @@ def movement(args)
       
       pos.x = (pos.x + RESOLUTION[:w]) % RESOLUTION[:w]
       pos.y = (pos.y + RESOLUTION[:h]) % RESOLUTION[:h]
-
-      # args.state.query.update_one({
-      #   _id: entity._id
-      # }, {
-      #   _set: {
-      #     position: pos,
-      #     velocity: vel
-      #   }
-      # })
-
-      p "We broke it #{pos.x}, #{pos.y}, #{vel}" if pos.x.nan?
     end
   end
 end
 
 
 def update_grid(args)
-  grid = args.state.query.find_one({ _id: :grid })
+  grid = args.state.query.find_one({ id: :grid })
   GRID_COLS.times do |x|
     GRID_ROWS.times do |y|
       grid.data[x][y] = []
@@ -206,6 +195,8 @@ def boot(args)
   args.state = {}
   args.state.data = {}
   args.state.query = Scry.new(args.state.data)
+  args.state.query.create_index(:id)
+
 
   BOIDS_COUNT.times do 
     velocity = Geometry.vec2_normalize({ x: rand - 0.5, y: rand - 0.5 })
@@ -221,7 +212,7 @@ def boot(args)
   end
 
   args.state.query.insert_one({
-    _id: :grid,
+    id: :grid,
     data: Array.new(GRID_COLS) { Array.new(GRID_ROWS) { [] } }
   })
 end

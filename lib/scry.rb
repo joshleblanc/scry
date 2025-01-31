@@ -2,12 +2,20 @@ class Scry
   attr_accessor :data 
 
   def initialize(data = [])
-    @data = data
-    @is_hash = data.is_a?(Hash)
+    if data.is_a?(Hash)
+      @data = data.values
+    else 
+      @data = data
+    end
+
+    @indices = {}
   end
 
-  def hash? 
-    @is_hash
+  def create_index(field)
+    @indices[field] = Hash.new { |h,k| h[k] = {} }
+    @data.each do |datum|
+      @indices[field][datum[field]] << datum
+    end
   end
 
   def find(query = {}, projection = {})
@@ -22,10 +30,12 @@ class Scry
     id = datum._id || GTK.create_uuid
     datum._id = id
     
-    if hash? 
-      data[id] = datum
-    else 
-      data << datum
+    data << datum
+
+    @indices.each do |k, v|
+      if datum.has_key?(k)
+        @indices[k][datum[k]] = datum
+      end
     end
     
     datum
@@ -62,11 +72,8 @@ class Scry
     record = query_one(query)
     return nil unless record
     
-    if hash? 
-      data.delete(record._id)
-    else 
-      data.delete(record)
-    end
+    data.delete(record)
+
     record
   end
 
@@ -79,16 +86,9 @@ class Scry
   private
 
   def query(query = {}, options = {})
-    if hash? && query._id && !validate_record(query, data[query._id])
-      return [data[query._id]]
-    end
-    
-    operating_data = if hash? 
-      data.values 
-    else
-      data
-    end
-
+    quick_find = query.find { |k, v| @indices.has_key?(k) && validate_record(query, @indices[k][query[k]]) }
+    return [@indices[quick_find.first][quick_find.last]] if quick_find
+    operating_data = data
 
     result = if query.empty?
       operating_data.lazy
@@ -114,15 +114,12 @@ class Scry
   end
 
   def query_one(query = {}, projection = {})
-    if query._id && hash? 
-      return data[query._id]
+    quick_find = query.find do |k, v| 
+      @indices.has_key?(k) && validate_record(query, @indices[k][query[k]]) 
     end
+    return @indices[quick_find.first][quick_find.last] if quick_find
 
-    operating_data = if hash? 
-      data.values
-    else
-      data
-    end
+    operating_data = data
     
     record = if query.empty?
       operating_data.first
@@ -212,10 +209,11 @@ class Scry
 
   def project(projection, record_or_records)
     return record_or_records unless projection
+    return record_or_records if projection.empty?
     
     projection = projection.merge(_id: true) unless projection.key?(:_id)
     
-    if record_or_records.respond_to?(:map)
+    if record_or_records.is_a?(Array) || record_or_records.is_a?(Enumerator::Lazy)
       record_or_records.map { |record| project_record(projection, record) }
     else
       project_record(projection, record_or_records)
