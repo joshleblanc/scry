@@ -1,4 +1,4 @@
-class Query
+class Scry
   attr_accessor :data 
 
   def initialize(data = [])

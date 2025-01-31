@@ -1,4 +1,3 @@
-
 RESOLUTION = {
   w: 1280,
   h: 720
@@ -206,7 +205,7 @@ end
 def boot(args)
   args.state = {}
   args.state.data = {}
-  args.state.query = Query.new(args.state.data)
+  args.state.query = Scry.new(args.state.data)
 
   BOIDS_COUNT.times do 
     velocity = Geometry.vec2_normalize({ x: rand - 0.5, y: rand - 0.5 })
