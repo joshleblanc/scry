@@ -1,4 +1,4 @@
 $gtk.disable_controller_config!
-require "lib/store"
+require "lib/query"
 
 require "samples/#{$gtk.cli_arguments.sample}/app/main"

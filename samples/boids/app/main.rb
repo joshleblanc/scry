@@ -27,7 +27,7 @@ DIFF = { x: 0, y: 0 }
 MOUSE = { x: 0, y: 0 }
 
 def neighbours(entity, entities) 
-  grid = Store.find_one({ _id: :grid })
+  grid = $args.state.query.find_one({ _id: :grid })
 
 
   grid_x = (entity.position.x / GRID_CELL_SIZE).floor
@@ -70,7 +70,7 @@ def vec2_add(a, b)
 end
 
 def movement(args)
-  entities = Store.find({
+  entities = args.state.query.find({
     position: { _exists: true },
     velocity: { _exists: true }
   })
@@ -153,7 +153,7 @@ def movement(args)
       pos.x = (pos.x + RESOLUTION[:w]) % RESOLUTION[:w]
       pos.y = (pos.y + RESOLUTION[:h]) % RESOLUTION[:h]
 
-      # Store.update_one({
+      # args.state.query.update_one({
       #   _id: entity._id
       # }, {
       #   _set: {
@@ -169,14 +169,14 @@ end
 
 
 def update_grid(args)
-  grid = Store.find_one({ _id: :grid })
+  grid = args.state.query.find_one({ _id: :grid })
   GRID_COLS.times do |x|
     GRID_ROWS.times do |y|
       grid.data[x][y] = []
     end
   end
     
-  entities = Store.find({
+  entities = args.state.query.find({
     position: {
       _exists: true
     }
@@ -192,7 +192,7 @@ def update_grid(args)
     grid_y = [[grid_y, 0].max, GRID_ROWS - 1].min
     
     grid.data[grid_x][grid_y] << entity
-    # Store.update_one({
+    # args.state.query.update_one({
     #   _id: grid._id,
     # }, {
     #   _push: {
@@ -205,11 +205,14 @@ end
 
 def boot(args)
   args.state = {}
+  args.state.data = {}
+  args.state.query = Query.new(args.state.data)
+
   BOIDS_COUNT.times do 
     velocity = Geometry.vec2_normalize({ x: rand - 0.5, y: rand - 0.5 })
     operand = (MIN_VELOCITY + (rand * (MAX_VELOCITY - MIN_VELOCITY)))
 
-    Store.insert_one({
+    args.state.query.insert_one({
       name: :boid,
       position: { x: rand * RESOLUTION.w, y: rand * RESOLUTION.h },
       size: { w: Numeric.rand(5..5), h: Numeric.rand(5..5) },
@@ -218,14 +221,14 @@ def boot(args)
     })
   end
 
-  Store.insert_one({
+  args.state.query.insert_one({
     _id: :grid,
     data: Array.new(GRID_COLS) { Array.new(GRID_ROWS) { [] } }
   })
 end
 
 def draw(args) 
-  entities = Store.find({
+  entities = args.state.query.find({
     position: { _exists: true },
     size: { _exists: true },
     color: { _exists: true }

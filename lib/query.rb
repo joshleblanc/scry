@@ -1,8 +1,13 @@
-module Store
-  extend self
+class Query
+  attr_accessor :data 
 
-  def data 
-    $args.state ||= {}
+  def initialize(data = [])
+    @data = data
+    @is_hash = data.is_a?(Hash)
+  end
+
+  def hash? 
+    @is_hash
   end
 
   def find(query = {}, projection = {})
@@ -17,7 +22,11 @@ module Store
     id = datum._id || GTK.create_uuid
     datum._id = id
     
-    data[id] = datum
+    if hash? 
+      data[id] = datum
+    else 
+      data << datum
+    end
     
     datum
   end
@@ -44,8 +53,8 @@ module Store
     record = query_one(query)
     return nil unless record
     
-    datum._id = record._id
-    data[record._id] = datum
+    record.merge!(datum)
+
     datum
   end
 
@@ -53,7 +62,11 @@ module Store
     record = query_one(query)
     return nil unless record
     
-    data.delete(record._id)
+    if hash? 
+      data.delete(record._id)
+    else 
+      data.delete(record)
+    end
     record
   end
 
@@ -66,23 +79,33 @@ module Store
   private
 
   def query(query = {}, options = {})
-    return [data[query._id]] if query._id && validate_record(query, data[query._id])
+    if hash? && query._id && !validate_record(query, data[query._id])
+      return [data[query._id]]
+    end
     
-    result = if query.empty?
-      data.values.lazy
+    operating_data = if hash? 
+      data.values 
     else
-      data.values.lazy.select { |record| validate_record(query, record) }
+      data
+    end
+
+
+    result = if query.empty?
+      operating_data.lazy
+    else
+      operating_data.lazy.select { |record| validate_record(query, record) }
     end
 
     result = project(options[:project], result) if options[:project]
     
-    if options[:sort]
-      result.sort! do |a, b|
-        options[:sort].map { |field, direction|
-          (a[field] <=> b[field]) * (direction > 0 ? 1 : -1)
-        }.find { |comp| comp != 0 } || 0
-      end
-    end
+    # sorting isn't working on lazy enumerables atm
+    # if options[:sort]
+    #   result.sort do |a, b|
+    #     options[:sort].map { |field, direction|
+    #       (a[field] <=> b[field]) * (direction > 0 ? 1 : -1)
+    #     }.find { |comp| comp != 0 } || 0
+    #   end
+    # end
 
     result = result.drop(options[:skip]) if options[:skip]
     result = result.take(options[:limit]) if options[:limit]
@@ -91,12 +114,20 @@ module Store
   end
 
   def query_one(query = {}, projection = {})
-    return data[query._id] if query._id
+    if query._id && hash? 
+      return data[query._id]
+    end
+
+    operating_data = if hash? 
+      data.values
+    else
+      data
+    end
     
     record = if query.empty?
-      data.values.first
+      operating_data.first
     else
-      data.values.find { |record| validate_record(query, record) }
+      operating_data.find { |record| validate_record(query, record) }
     end
     
     record ? project(projection, record) : nil
@@ -104,8 +135,8 @@ module Store
 
   def validate_record(query, record)
     return false unless record
-    return false unless record.is_a?(Hash)
-    
+    return false unless record.is_a?(Hash) || record.respond_to?(:[])
+
     query.all? do |field, value|
       if value.is_a?(Hash) && !value.empty?
         process_selectors(record, field, value)
@@ -116,7 +147,10 @@ module Store
   end
 
   def traverse_field(record, field)
-    field.to_s.split('.').inject(record) { |memo, part| memo && memo[fix_key(memo, part)] }
+    field.to_s.split('.').inject(record) do |memo, part| 
+      key = fix_key(memo, part)
+      memo && memo[key]
+    end
   end
 
   def process_selectors(record, field, selectors)
@@ -181,7 +215,7 @@ module Store
     
     projection = projection.merge(_id: true) unless projection.key?(:_id)
     
-    if record_or_records.is_a?(Array)
+    if record_or_records.respond_to?(:map)
       record_or_records.map { |record| project_record(projection, record) }
     else
       project_record(projection, record_or_records)
