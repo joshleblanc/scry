@@ -57,3 +57,14 @@ high_level = store.find({ level: { '_gt' => 40 } })
 | _nor    | `{ _nor: [{ level: { _gt: 40 }}, { class: { _eq: 'Ranger' }}] }` |
 | _not    | `{ _not: { level: { _gt: 40 }}, { class: { _eq: 'Ranger' }}] }` |
 
+## Indexes
+
+Supports _very_ basic indexes, which simply check key = value and returns via a hash lookup
+
+```ruby
+store = Scry.new({})
+store.create_index(:id)
+```
+
+`_id` is implicitly indexed.
+

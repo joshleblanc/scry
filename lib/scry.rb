@@ -9,6 +9,7 @@ class Scry
     end
 
     @indices = {}
+    create_index(:_id)
   end
 
   def create_index(field)

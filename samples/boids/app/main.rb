@@ -26,7 +26,7 @@ DIFF = { x: 0, y: 0 }
 MOUSE = { x: 0, y: 0 }
 
 def neighbours(entity, entities) 
-  grid = $args.state.query.find_one({ id: :grid })
+  grid = $args.state.query.find_one({ _id: :grid })
 
 
   grid_x = (entity.position.x / GRID_CELL_SIZE).floor
@@ -157,7 +157,7 @@ end
 
 
 def update_grid(args)
-  grid = args.state.query.find_one({ id: :grid })
+  grid = args.state.query.find_one({ _id: :grid })
   GRID_COLS.times do |x|
     GRID_ROWS.times do |y|
       grid.data[x][y] = []
@@ -195,7 +195,6 @@ def boot(args)
   args.state = {}
   args.state.data = {}
   args.state.query = Scry.new(args.state.data)
-  args.state.query.create_index(:id)
 
 
   BOIDS_COUNT.times do 
@@ -212,7 +211,7 @@ def boot(args)
   end
 
   args.state.query.insert_one({
-    id: :grid,
+    _id: :grid,
     data: Array.new(GRID_COLS) { Array.new(GRID_ROWS) { [] } }
   })
 end
